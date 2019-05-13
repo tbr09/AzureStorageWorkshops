@@ -1,7 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Storage;
-using Microsoft.Azure.Storage.Auth;
 using Microsoft.Azure.Storage.Blob;
 using Microsoft.Extensions.Configuration;
 using System;
@@ -36,9 +35,7 @@ namespace AzureStorageMVC.Controllers
 
         private async Task UploadToBlob(Stream file, string fileName)
         {
-            StorageCredentials storageCredentials = new StorageCredentials(configuration["AzureStorage:AccountName"], configuration["AzureStorage:AccountKey"]);
-
-            CloudStorageAccount storageAccount = new CloudStorageAccount(storageCredentials, true);
+            CloudStorageAccount storageAccount = CloudStorageAccount.Parse(configuration["AzureStorage:ConnectionString"]);
 
             CloudBlobClient blobClient = storageAccount.CreateCloudBlobClient();
 
