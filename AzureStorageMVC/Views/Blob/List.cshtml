@@ -1,0 +1,42 @@
+﻿@model IEnumerable<AzureStorageMVC.Models.BlobEntity>
+
+    @{
+    ViewData["Title"] = "List";
+    }
+
+    <h1>Avatars</h1>
+
+    <p>
+        <a asp-action="Add">Add new</a>
+    </p>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>
+                    @Html.DisplayNameFor(model => model.Name)
+                </th>
+                <th>
+                    @Html.DisplayNameFor(model => model.Url)
+                </th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in Model)
+            {
+            <tr>
+                <td>
+                    @Html.DisplayFor(modelItem => item.Name)
+                </td>
+                <td>
+                    <a href="@item.Url" target="_blank" class="button Secondary">
+                        @item.Url
+                    </a>
+                </td>
+                <td>
+                    @Html.ActionLink("Delete", "Delete", new {  filename = item.Name  })
+                </td>
+            </tr>
+            }
+        </tbody>
+    </table>

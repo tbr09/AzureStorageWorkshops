@@ -1,0 +1,25 @@
+﻿@{
+    ViewData["Title"] = "Add new blob";
+}
+
+<h1>Add new Promotion</h1>
+
+<hr />
+<div class="row">
+    <div class="col-md-4">
+        <form asp-controller="Home" asp-action="Add" method="post" enctype="multipart/form-data">
+            <div class="form-group">
+                <input type="file" name="file" />
+            </div>
+            <hr />
+
+            <div class="form-group">
+                <button class="btn btn-primary" type="submit">Upload file</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div>
+    <a asp-action="List">Back to List</a>
+</div>
