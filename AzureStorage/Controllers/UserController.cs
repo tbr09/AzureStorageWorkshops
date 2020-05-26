@@ -1,12 +1,12 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Azure.Storage;
+using Azure.Storage.Blobs;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Azure.Storage;
-using Microsoft.Azure.Storage.Auth;
-using Microsoft.Azure.Storage.Blob;
 using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace AzureStorage.Controllers
@@ -15,22 +15,32 @@ namespace AzureStorage.Controllers
     [Route("[controller]")] 
     public class UserController : ControllerBase
     {
-        private readonly IConfiguration configuration;
+        private readonly BlobServiceClient blobServiceClient;
 
         public UserController(IConfiguration configuration)
         {
-            this.configuration = configuration;
+            var blobServiceEndpoint = configuration.GetValue<string>("AzureStorage:BlobServiceEndpoint");
+            var storageAccountName = configuration.GetValue<string>("AzureStorage:AccountName");
+            var storageAccountKey = configuration.GetValue<string>("AzureStorage:AccountKey");
+
+            // First option - credentials
+            StorageSharedKeyCredential accountCredentials = new StorageSharedKeyCredential(storageAccountName, storageAccountKey);
+            blobServiceClient = new BlobServiceClient(new Uri(blobServiceEndpoint), accountCredentials);
+
+            // Second option - connection string
+            //var storageConnectionString = configuration.GetValue<string>("AzureStorage:ConnectionString");
+            //blobServiceClient = new BlobServiceClient(storageConnectionString);
         }
 
         [HttpPost]
         [Route("changeAvatar")]
-        public async Task<IActionResult> ChangeAvatar(IFormFile file)
+        public async Task<IActionResult> ChangeAvatar(IFormFile file, CancellationToken cancellationToken)
         {
             try
             {
                 var stream = file.OpenReadStream();
-                var name = file.FileName;
-                await UploadToBlob(stream, name);
+                BlobContainerClient container = blobServiceClient.GetBlobContainerClient("avatars");
+                await container.UploadBlobAsync($"{Guid.NewGuid()}-{file.FileName}", stream, cancellationToken);
 
                 return new OkResult();
             }
@@ -40,25 +50,13 @@ namespace AzureStorage.Controllers
             }
         }
 
-        private async Task UploadToBlob(Stream file, string fileName)
+        private async Task UploadToBlob(Stream file, string fileName, CancellationToken cancellationToken)
         {
-            // Dane dostępowe 
-            StorageCredentials storageCredentials = new StorageCredentials(configuration["AzureStorage:AccountName"], configuration["AzureStorage:AccountKey"]);
-
-            // Obiekt reprezentujący konto Storage
-            CloudStorageAccount storageAccount = new CloudStorageAccount(storageCredentials, true);
-
-            // Obiekt reprezentujący serwis Blob w obrębie wybranego konta Storage
-            CloudBlobClient blobClient = storageAccount.CreateCloudBlobClient();
-
             // Podany kontener Blob dla avatarów
-            CloudBlobContainer container = blobClient.GetContainerReference("avatars");
+            BlobContainerClient container = blobServiceClient.GetBlobContainerClient("avatars");
 
             // Tworzenie nowego pliku blob
-            CloudBlockBlob blockBlob = container.GetBlockBlobReference($"{Guid.NewGuid()}-{fileName}.jpg");
-
-            // Wgrywanie podanego pliku do bloba
-            await blockBlob.UploadFromStreamAsync(file);
+            await container.UploadBlobAsync($"{Guid.NewGuid()}-{fileName}.jpg", file, cancellationToken);
         }
     }
 }

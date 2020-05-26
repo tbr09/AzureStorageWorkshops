@@ -1,5 +1,5 @@
-﻿using Microsoft.Azure.Storage;
-using Microsoft.Azure.Storage.Blob;
+﻿using Azure.Storage;
+using Azure.Storage.Blobs;
 using Microsoft.Extensions.Configuration;
 using System;
 using System.IO;
@@ -9,31 +9,33 @@ namespace AzureStorageMVC.Services
 {
     public class BlobStorageService 
     {
-        private readonly CloudStorageAccount storageAccount;
-        private readonly CloudBlobClient blobClient;
+        private readonly BlobServiceClient blobServiceClient;
 
         public BlobStorageService(IConfiguration configuration)
         {
-            storageAccount = CloudStorageAccount.Parse(configuration["AzureStorage:ConnectionString"]);
-            blobClient = storageAccount.CreateCloudBlobClient();
+            var blobServiceEndpoint = configuration.GetValue<string>("AzureStorage:BlobServiceEndpoint");
+            var storageAccountName = configuration.GetValue<string>("AzureStorage:AccountName");
+            var storageAccountKey = configuration.GetValue<string>("AzureStorage:AccountKey");
+
+            // First option - credentials
+            StorageSharedKeyCredential accountCredentials = new StorageSharedKeyCredential(storageAccountName, storageAccountKey);
+            blobServiceClient = new BlobServiceClient(new Uri(blobServiceEndpoint), accountCredentials);
+
+            // Second option - connection string
+            //var storageConnectionString = configuration.GetValue<string>("AzureStorage:ConnectionString");
+            //blobServiceClient = new BlobServiceClient(storageConnectionString);
         }
 
         public async Task UploadToBlob(Stream file, string fileName, string containerName)
         {
-            var blobContainer = blobClient.GetContainerReference(containerName);
-
-            CloudBlockBlob blockBlob = blobContainer.GetBlockBlobReference($"{Guid.NewGuid()}-{fileName}");
-
-            await blockBlob.UploadFromStreamAsync(file);
+            BlobContainerClient container = blobServiceClient.GetBlobContainerClient(containerName);
+            await container.UploadBlobAsync(fileName, file);
         }
 
         public async Task DeleteBlob(string fileName, string containerName)
         {
-            var blobContainer = blobClient.GetContainerReference(containerName);
-
-            var blob = blobContainer.GetBlockBlobReference(fileName);
-
-            await blob.DeleteIfExistsAsync();
+            BlobContainerClient container = blobServiceClient.GetBlobContainerClient(containerName);
+            await container.DeleteBlobAsync(fileName);
         }
     }
 }

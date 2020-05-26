@@ -1,42 +1,56 @@
-﻿using AzureStorageMVC.Models;
+﻿using Azure.Storage;
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
+using AzureStorageMVC.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Azure.Storage;
-using Microsoft.Azure.Storage.Blob;
 using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace AzureStorageMVC.Controllers
 {
     public class BlobController : Controller
     {
-        private readonly CloudBlobClient blobClient;
+        private readonly BlobServiceClient blobServiceClient;
 
         public BlobController(IConfiguration configuration)
         {
-            var storageAccount = CloudStorageAccount
-                .Parse(configuration["AzureStorage:ConnectionString"]);
-            blobClient = storageAccount.CreateCloudBlobClient();
+            var blobServiceEndpoint = configuration.GetValue<string>("AzureStorage:BlobServiceEndpoint");
+            var storageAccountName = configuration.GetValue<string>("AzureStorage:AccountName");
+            var storageAccountKey = configuration.GetValue<string>("AzureStorage:AccountKey");
+
+            // First option - credentials
+            StorageSharedKeyCredential accountCredentials = new StorageSharedKeyCredential(storageAccountName, storageAccountKey);
+            blobServiceClient = new BlobServiceClient(new Uri(blobServiceEndpoint), accountCredentials);
+
+            // Second option - connection string
+            //var storageConnectionString = configuration.GetValue<string>("AzureStorage:ConnectionString");
+            //blobServiceClient = new BlobServiceClient(storageConnectionString);
         }
 
-        public IActionResult List()
+        public async Task<IActionResult> ListAsync()
         {
-            CloudBlobContainer container = blobClient.GetContainerReference("avatars");
+            BlobContainerClient container = blobServiceClient.GetBlobContainerClient("avatars");
 
-            var blobList = container.ListBlobs()
-                .OfType<CloudBlockBlob>()
-                .Select(b => new BlobEntity()
-                {
-                    Name = b.Name,
-                    Url = b.Uri.ToString()
-                })
-                .ToList();
+            var blobs = new List<BlobClient>();
 
-            return View(blobList);
+            await foreach (BlobItem blob in container.GetBlobsAsync())
+            {
+                var blobClient = container.GetBlobClient(blob.Name);
+                blobs.Add(blobClient);
+            }
+
+            var result = blobs.Select(b => new BlobEntity()
+            {
+                Name = b.Name,
+                Url = b.Uri.ToString()
+            });
+
+            return View(result);
         }
 
 
@@ -46,26 +60,22 @@ namespace AzureStorageMVC.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> Add(IFormFile file)
+        public async Task<IActionResult> Add(IFormFile file, CancellationToken cancellationToken)
         {
             var stream = file.OpenReadStream();
 
-            CloudBlobContainer container = blobClient.GetContainerReference("avatars");
+            BlobContainerClient container = blobServiceClient.GetBlobContainerClient("avatars");
 
-            CloudBlockBlob blockBlob = container.GetBlockBlobReference($"{Guid.NewGuid()}-{file.FileName}");
-
-            await blockBlob.UploadFromStreamAsync(stream);
+            await container.UploadBlobAsync($"{Guid.NewGuid()}-{file.FileName}", stream, cancellationToken);
 
             return RedirectToAction("List");
         }
 
         public async Task<IActionResult> Delete(string fileName)
         {
-            CloudBlobContainer container = blobClient.GetContainerReference("avatars");
+            BlobContainerClient container = blobServiceClient.GetBlobContainerClient("avatars");
 
-            var blob = container.GetBlockBlobReference(fileName);
-
-            await blob.DeleteIfExistsAsync();
+            await container.DeleteBlobAsync(fileName);
 
             return RedirectToAction("List");
         }

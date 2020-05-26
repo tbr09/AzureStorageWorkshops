@@ -14,8 +14,7 @@ namespace AzureStorageMVC.Controllers
 
         public TableController(IConfiguration configuration)
         {
-            var storageAccount = CloudStorageAccount
-                .Parse(configuration.GetValue<string>("AzureStorage:ConnectionString"));
+            var storageAccount = CloudStorageAccount.Parse(configuration.GetValue<string>("AzureStorage:ConnectionString"));
             tableClient = storageAccount.CreateCloudTableClient();
         }
 
